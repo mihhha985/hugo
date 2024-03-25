@@ -17,24 +17,6 @@ func main() {
 	http.ListenAndServe(":8080", r)
 }
 
-type ReverseProxy struct {
-	host string
-	port string
-}
-
-func NewReverseProxy(host, port string) *ReverseProxy {
-	return &ReverseProxy{
-		host: host,
-		port: port,
-	}
-}
-
-func (rp *ReverseProxy) ReverseProxy(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-	})
-}
-
 const content = ``
 
 func WorkerTest() {
