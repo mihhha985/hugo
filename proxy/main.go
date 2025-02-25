@@ -77,7 +77,7 @@ func searchAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "%v", addresses[0].Result)
+	fmt.Fprintf(w, "%v", addresses)
 }
 
 func geocodeAddress(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,8 @@ func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 
 	var reqBody RequestAddressGeocode
 	err := json.NewDecoder(r.Body).Decode(&reqBody)
-	if err != nil {
+	fmt.Println(reqBody)
+	if err != nil || reqBody.Lat == "" || reqBody.Lng == "" {
 		http.Error(w, "Не указан запрос", http.StatusBadRequest)
 		return
 	}
