@@ -7,7 +7,10 @@ import (
 	"net/http"
 	"strings"
 
+	_ "test/docs"
+
 	"github.com/go-chi/chi"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 const DADATA_API_KEY = "ced67ee66aaf9f6df09e8e17e7ce3ffb56a05f8c"
@@ -41,6 +44,16 @@ type RequestAddressGeocode struct {
 	Lng string `json:"lng"`
 }
 
+// @Summary Поиск адреса
+// @Description Этот эндпоинт ищет адрес через API DaData.
+// @Tags address
+// @Accept json
+// @Produce json
+// @Param request body RequestAddressSearch true "Запрос поиска адреса"
+// @Success 200 {object} ResponseAddress
+// @Failure 400 {string} string "Некорректный запрос"
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /search [post]
 func searchAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 
@@ -80,12 +93,21 @@ func searchAddress(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", addresses)
 }
 
+// @Summary Геокодинг адреса
+// @Description Получение координат адреса через API DaData.
+// @Tags address
+// @Accept json
+// @Produce json
+// @Param request body RequestAddressGeocode true "Запрос на геокодинг"
+// @Success 200 {object} ResponseAddress
+// @Failure 400 {string} string "Некорректный запрос"
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /geocode [post]
 func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 
 	var reqBody RequestAddressGeocode
 	err := json.NewDecoder(r.Body).Decode(&reqBody)
-	fmt.Println(reqBody)
 	if err != nil || reqBody.Lat == "" || reqBody.Lng == "" {
 		http.Error(w, "Не указан запрос", http.StatusBadRequest)
 		return
@@ -119,8 +141,17 @@ func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", string(response))
 }
 
+// @title Swagger Example API
+// @version 1.0
+// @description This is a sample server
+// @host localhost:8080
+// @BasePath /api
 func main() {
 	r := chi.NewRouter()
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL(" http://localhost:8080/swagger/doc.json"),
+	))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, world!"))

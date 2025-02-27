@@ -9,6 +9,12 @@ COPY . .
 # Скачиваем все зависимости
 RUN go mod tidy
 
+# Устанавливаем swag CLI для генерации документации
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
+# Генерируем Swagger-документацию
+RUN swag init -g main.go
+
 # Собираем приложение
 RUN go build -o main
 

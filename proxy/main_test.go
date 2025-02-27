@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,7 +63,6 @@ func TestGeocodeAddressBadRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(req.StatusCode)
 	if req.StatusCode != http.StatusBadRequest {
 		t.Errorf("Expected status code %d. Got %d", http.StatusBadRequest, req.StatusCode)
 	}
