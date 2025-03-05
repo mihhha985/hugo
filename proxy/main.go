@@ -7,11 +7,20 @@ import (
 	"net/http"
 	"strings"
 
-	_ "test/docs"
+	//_ "test/docs"
 
-	"github.com/go-chi/chi"
-	httpSwagger "github.com/swaggo/http-swagger"
+	chi "github.com/go-chi/chi/v5"
+	jwtauth "github.com/go-chi/jwtauth/v5"
+	//httpSwagger "github.com/swaggo/http-swagger"
 )
+
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+var tokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
+var user User
 
 const DADATA_API_KEY = "ced67ee66aaf9f6df09e8e17e7ce3ffb56a05f8c"
 const DADATA_SECRET_KEY = "d2ecbadfc616acaa12cbd48270e5fe685b8eb7fc"
@@ -141,6 +150,34 @@ func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", string(response))
 }
 
+func login(w http.ResponseWriter, r *http.Request) {
+	loginUser := User{}
+	err := json.NewDecoder(r.Body).Decode(&loginUser)
+	if err != nil {
+		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		return
+	}
+
+	if loginUser.Username == user.Username && loginUser.Password == user.Password {
+		_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user": loginUser.Username})
+		fmt.Fprintf(w, "token: %s", tokenString)
+	} else {
+		http.Error(w, "Неверный логин или пароль", http.StatusUnauthorized)
+	}
+}
+
+func register(w http.ResponseWriter, r *http.Request) {
+	user := User{}
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		return
+	}
+
+	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{"user": user.Username})
+	fmt.Fprintf(w, "token: %s", tokenString)
+}
+
 // @title Swagger Example API
 // @version 1.0
 // @description This is a sample server
@@ -148,17 +185,24 @@ func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 // @BasePath /api
 func main() {
 	r := chi.NewRouter()
-
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL(" http://localhost:8080/swagger/doc.json"),
-	))
-
+	/*
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL(" http://localhost:8080/swagger/doc.json"),
+		))
+	*/
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, world!"))
 	})
 
-	r.Post("/api/address/search", searchAddress)
-	r.Post("/api/address/geocode", geocodeAddress)
+	r.Post("/api/login", login)
+	r.Post("/api/register", register)
+
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.Verifier(tokenAuth))
+		r.Use(jwtauth.Authenticator(tokenAuth))
+		r.Post("/api/address/search", searchAddress)
+		r.Post("/api/address/geocode", geocodeAddress)
+	})
 
 	http.ListenAndServe(":8080", r)
 }
