@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	_ "test/docs"
@@ -53,7 +54,7 @@ type RequestAddressGeocode struct {
 // @Success 200 {object} ResponseAddress
 // @Failure 400 {string} string "Некорректный запрос"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /search [post]
+// @Router /address/search [post]
 func searchAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 
@@ -102,18 +103,28 @@ func searchAddress(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} ResponseAddress
 // @Failure 400 {string} string "Некорректный запрос"
 // @Failure 500 {string} string "Ошибка сервера"
-// @Router /geocode [post]
+// @Router /address/geocode [post]
 func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 
 	var reqBody RequestAddressGeocode
 	err := json.NewDecoder(r.Body).Decode(&reqBody)
 	if err != nil || reqBody.Lat == "" || reqBody.Lng == "" {
-		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
 		return
 	}
-
-	body := strings.NewReader(`{ "lat": "` + reqBody.Lat + `", "lon": "` + reqBody.Lng + `" }`)
+	var lat float64
+	if lat, err = strconv.ParseFloat(reqBody.Lat, 64); err != nil {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+	var lon float64
+	if lon, err = strconv.ParseFloat(reqBody.Lng, 64); err != nil {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+	request := fmt.Sprintf(`{ "lat": "%f", "lon": "%f" }`, lat, lon)
+	body := strings.NewReader(request)
 	req, err := http.NewRequest("POST", "http://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address", body)
 	if err != nil {
 		fmt.Println(err.Error())
