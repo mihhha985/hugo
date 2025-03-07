@@ -7,12 +7,25 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	_ "test/docs"
 
-	"github.com/go-chi/chi"
+	chi "github.com/go-chi/chi/v5"
+	jwtauth "github.com/go-chi/jwtauth/v5"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"golang.org/x/crypto/bcrypt"
 )
+
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+var mx sync.RWMutex
+var tokenAuth = jwtauth.New("HS256", []byte("secret"), nil)
+var users = make(map[string]User)
 
 const DADATA_API_KEY = "ced67ee66aaf9f6df09e8e17e7ce3ffb56a05f8c"
 const DADATA_SECRET_KEY = "d2ecbadfc616acaa12cbd48270e5fe685b8eb7fc"
@@ -54,6 +67,7 @@ type RequestAddressGeocode struct {
 // @Success 200 {object} ResponseAddress
 // @Failure 400 {string} string "Некорректный запрос"
 // @Failure 500 {string} string "Ошибка сервера"
+// @Security BearerAuth
 // @Router /address/search [post]
 func searchAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
@@ -103,6 +117,7 @@ func searchAddress(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} ResponseAddress
 // @Failure 400 {string} string "Некорректный запрос"
 // @Failure 500 {string} string "Ошибка сервера"
+// @Security BearerAuth
 // @Router /address/geocode [post]
 func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
@@ -152,24 +167,102 @@ func geocodeAddress(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", string(response))
 }
 
+// @Summary Авторизация
+// @Description Авторизация пользователя.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body User true "Пользователь"
+// @Success 200 {string} string "Токен"
+// @Failure 400 {string} string "Некорректный запрос"
+// @Failure 200 {string} string "Логин или пароль неверный"
+// @Router /login [post]
+func login(w http.ResponseWriter, r *http.Request) {
+	loginUser := User{}
+	err := json.NewDecoder(r.Body).Decode(&loginUser)
+	if err != nil {
+		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		return
+	}
+
+	mx.Lock()
+	defer mx.Unlock()
+	user, ok := users[loginUser.Username]
+	if !ok {
+		http.Error(w, "Логин или пароль неверный", http.StatusOK)
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password))
+	if err != nil {
+		http.Error(w, "Логин или пароль неверный", http.StatusOK)
+		return
+	}
+
+	_, tokenString, _ := tokenAuth.Encode(map[string]interface{}{
+		"username": user.Username,
+		"exp":      time.Now().Add(1 * time.Hour).Unix(),
+	})
+	fmt.Fprintf(w, "token: %s", tokenString)
+}
+
+// @Summary Регистрация
+// @Description Регистрация пользователя.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body User true "Пользователь"
+// @Success 200 {string} string "Пользователь добавлен"
+// @Failure 400 {string} string "Некорректный запрос"
+// @Failure 500 {string} string "Ошибка сервера"
+// @Router /register [post]
+func register(w http.ResponseWriter, r *http.Request) {
+	user := User{}
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		return
+	}
+
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Ошибка при создании пользователя", http.StatusInternalServerError)
+		return
+	}
+
+	mx.Lock()
+	defer mx.Unlock()
+	users[user.Username] = User{Username: user.Username, Password: string(hashPassword)}
+	fmt.Fprintf(w, "add new user, username: %s", user.Username)
+}
+
 // @title Swagger Example API
 // @version 1.0
 // @description This is a sample server
 // @host localhost:8080
 // @BasePath /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	r := chi.NewRouter()
-
 	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL(" http://localhost:8080/swagger/doc.json"),
+		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
 	))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, world!"))
 	})
 
-	r.Post("/api/address/search", searchAddress)
-	r.Post("/api/address/geocode", geocodeAddress)
+	r.Post("/api/login", login)
+	r.Post("/api/register", register)
+
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.Verifier(tokenAuth))
+		r.Use(jwtauth.Authenticator(tokenAuth))
+		r.Post("/api/address/search", searchAddress)
+		r.Post("/api/address/geocode", geocodeAddress)
+	})
 
 	http.ListenAndServe(":8080", r)
 }
