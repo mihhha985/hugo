@@ -67,3 +67,63 @@ func TestGeocodeAddressBadRequest(t *testing.T) {
 		t.Errorf("Expected status code %d. Got %d", http.StatusBadRequest, req.StatusCode)
 	}
 }
+
+func TestRegisterUserSuccess(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(register))
+	defer ts.Close()
+
+	query, _ := json.Marshal(User{Username: "test3", Password: "test3"})
+	req, err := http.Post(ts.URL+"/api/register", "application/json", bytes.NewReader(query))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if req.StatusCode != http.StatusOK {
+		t.Errorf("Expected status code %d. Got %d", http.StatusOK, req.StatusCode)
+	}
+}
+
+func TestRegisterUserBadRequest(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(register))
+	defer ts.Close()
+
+	query, _ := json.Marshal(User{})
+	req, err := http.Post(ts.URL+"/api/register", "application/json", bytes.NewReader(query))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if req.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status code %d. Got %d", http.StatusBadRequest, req.StatusCode)
+	}
+}
+
+func TestLoginSuccess(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(login))
+	defer ts.Close()
+
+	query, _ := json.Marshal(User{Username: "test", Password: "test"})
+	req, err := http.Post(ts.URL+"/api/login", "application/json", bytes.NewReader(query))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if req.StatusCode != http.StatusOK {
+		t.Errorf("Expected status code %d. Got %d", http.StatusOK, req.StatusCode)
+	}
+}
+
+func TestLoginBadRequest(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(login))
+	defer ts.Close()
+
+	query, _ := json.Marshal(User{})
+	req, err := http.Post(ts.URL+"/api/login", "application/json", bytes.NewReader(query))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if req.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status code %d. Got %d", http.StatusBadRequest, req.StatusCode)
+	}
+}

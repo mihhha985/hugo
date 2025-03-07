@@ -185,6 +185,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if loginUser.Username == "" || loginUser.Password == "" {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
 	mx.Lock()
 	defer mx.Unlock()
 	user, ok := users[loginUser.Username]
@@ -220,7 +225,18 @@ func register(w http.ResponseWriter, r *http.Request) {
 	user := User{}
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, "Не указан запрос", http.StatusBadRequest)
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
+	if user.Username == "" || user.Password == "" {
+		http.Error(w, "Некорректный запрос", http.StatusBadRequest)
+		return
+	}
+
+	_, ok := users[user.Username]
+	if ok {
+		http.Error(w, "Пользователь уже существует", http.StatusBadRequest)
 		return
 	}
 
