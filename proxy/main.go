@@ -101,7 +101,12 @@ func searchAddress(w http.ResponseWriter, r *http.Request) {
 	var addresses []Address
 	err = json.NewDecoder(resp.Body).Decode(&addresses)
 	if err != nil {
-		http.Error(w, "Ошибка при обработке ответа", 400)
+		http.Error(w, "Ошибка при обработке ответа", http.StatusBadRequest)
+		return
+	}
+
+	if len(addresses) == 0 || addresses[0].Result == "" {
+		http.Error(w, "Адрес не найден", http.StatusBadRequest)
 		return
 	}
 
